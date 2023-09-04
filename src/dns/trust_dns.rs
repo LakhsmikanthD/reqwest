@@ -31,6 +31,14 @@ pub fn reinitialize_system_conf() {
     *conf = Lazy::new(|| system_conf::read_system_conf().map_err(io::Error::from));
 }
 
+fn get_system_conf() -> io::Result<(ResolverConfig, ResolverOpts)> {
+    let mut conf = SYSTEM_CONF.lock().unwrap();
+    if conf.is_none() {
+        *conf = Some(initialize_system_conf());
+    }
+    conf.clone().unwrap()
+}
+
 /// Wrapper around an `AsyncResolver`, which implements the `Resolve` trait.
 #[derive(Debug, Clone)]
 pub(crate) struct TrustDnsResolver {
@@ -51,7 +59,7 @@ impl TrustDnsResolver {
     /// Create a new resolver with the default configuration,
     /// which reads from `/etc/resolve.conf`.
     pub fn new() -> io::Result<Self> {
-        SYSTEM_CONF.as_ref().map_err(|e| {
+        get_system_conf().as_ref().map_err(|e| {
             io::Error::new(e.kind(), format!("error reading DNS system conf: {}", e))
         })?;
 
@@ -101,7 +109,7 @@ impl Iterator for SocketAddrs {
 }
 
 async fn new_resolver() -> Result<SharedResolver, BoxError> {
-    let (config, opts) = SYSTEM_CONF
+    let (config, opts) = get_system_conf()
         .as_ref()
         .expect("can't construct TrustDnsResolver if SYSTEM_CONF is error")
         .clone();
