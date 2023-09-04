@@ -19,8 +19,17 @@ use crate::error::BoxError;
 
 type SharedResolver = Arc<AsyncResolver<TokioConnection, TokioConnectionProvider>>;
 
-static SYSTEM_CONF: Lazy<io::Result<(ResolverConfig, ResolverOpts)>> =
-    Lazy::new(|| system_conf::read_system_conf().map_err(io::Error::from));
+lazy_static! {
+    static ref SYSTEM_CONF: Mutex<Lazy<io::Result<(ResolverConfig, ResolverOpts)>>> = {
+        let data = Lazy::new(|| system_conf::read_system_conf().map_err(io::Error::from));
+        Mutex::new(data)
+    };
+}
+
+pub fn reinitialize_system_conf() {
+    let mut conf = SYSTEM_CONF.lock().unwrap();
+    *conf = Lazy::new(|| system_conf::read_system_conf().map_err(io::Error::from));
+}
 
 /// Wrapper around an `AsyncResolver`, which implements the `Resolve` trait.
 #[derive(Debug, Clone)]
