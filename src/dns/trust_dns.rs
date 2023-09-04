@@ -21,21 +21,18 @@ type SharedResolver = Arc<AsyncResolver<TokioConnection, TokioConnectionProvider
 
 lazy_static! {
     static ref SYSTEM_CONF: Mutex<Lazy<io::Result<(ResolverConfig, ResolverOpts)>>> = {
-        let data = Lazy::new(|| system_conf::read_system_conf().map_err(io::Error::from));
+        let data = Lazy::new(|| Box::new(system_conf::read_system_conf().map_err(io::Error::from)));
         Mutex::new(data)
     };
 }
 
 pub fn reinitialize_system_conf() {
-    let mut conf = SYSTEM_CONF.lock().unwrap();
+    let mut conf = SYSTEM_CONF.lock().await.unwrap();
     *conf = Lazy::new(|| system_conf::read_system_conf().map_err(io::Error::from));
 }
 
 fn get_system_conf() -> io::Result<(ResolverConfig, ResolverOpts)> {
-    let mut conf = SYSTEM_CONF.lock().unwrap();
-    if conf.is_none() {
-        *conf = Some(initialize_system_conf());
-    }
+    let mut conf = SYSTEM_CONF.lock().await.unwrap();
     conf.clone().unwrap()
 }
 
